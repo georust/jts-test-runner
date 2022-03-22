@@ -1,13 +1,10 @@
 use std::collections::BTreeSet;
 
 use approx::relative_eq;
-use include_dir::{include_dir, Dir, DirEntry};
 use log::{debug, info};
 
 use super::{input, Operation, Result};
 use geo::{intersects::Intersects, prelude::Contains, Coordinate, Geometry, LineString, Polygon};
-
-const GENERAL_TEST_XML: Dir = include_dir!("resources/testxml/general");
 
 #[derive(Debug, Default)]
 pub struct TestRunner {
@@ -430,23 +427,10 @@ impl TestRunner {
     fn parse_cases(&self) -> Result<Vec<TestCase>> {
         let mut cases = vec![];
 
-        let filename_filter = if let Some(filter) = &self.filename_filter {
-            filter.to_string()
-        } else {
-            "**/*.xml".to_string()
-        };
-
-        for entry in GENERAL_TEST_XML.find(&filename_filter)? {
-            let file = match entry {
-                DirEntry::Dir(_) => {
-                    debug_assert!(false, "unexpectedly found dir.xml");
-                    continue;
-                }
-                DirEntry::File(file) => file,
-            };
+        for file in TestFiles::general(self.filename_filter.as_ref().map(|s| s.as_str())) {
+            let file = file?;
             debug!("deserializing from {:?}", file.path());
-            let file_reader = std::io::BufReader::new(file.contents());
-            let run: input::Run = match serde_xml_rs::from_reader(file_reader) {
+            let run: input::Run = match serde_xml_rs::from_reader(file.contents()?.as_slice()) {
                 Ok(r) => r,
                 Err(err) => {
                     debug!(
@@ -475,7 +459,7 @@ impl TestRunner {
                     let test_file_name = file
                         .path()
                         .file_name()
-                        .expect("file from include_dir unexpectedly missing name")
+                        .expect("file from test fixtures unexpectedly missing name")
                         .to_string_lossy()
                         .to_string();
 
@@ -543,4 +527,50 @@ where
         (0..len).all(|i| coord_matcher(&r1.0[i], &r2.0[(i + shift) % len]))
             || (0..len).all(|i| coord_matcher(&r1.0[len - i], &r2.0[(i + shift) % len]))
     })
+}
+
+use std::path::PathBuf;
+struct TestFiles(glob::Paths);
+impl TestFiles {
+    fn new(iterator: glob::Paths) -> Self {
+        Self(iterator)
+    }
+
+    fn general(filename_filter: Option<&str>) -> Self {
+        let pkg_root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let filename_filter = filename_filter.unwrap_or("*.xml");
+        let paths = format!("{}/resources/testxml/general/{}", pkg_root, filename_filter);
+
+        Self::new(glob::glob(&paths).expect("bad pattern"))
+    }
+}
+
+use std::path::Path;
+struct TestFile {
+    path: PathBuf,
+}
+
+impl TestFile {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+    pub fn contents(&self) -> Result<Vec<u8>> {
+        Ok(std::fs::read(&self.path)?)
+    }
+}
+
+impl IntoIterator for TestFiles {
+    type Item = Result<TestFile>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let f: Vec<_> = self
+            .0
+            .map(|path| {
+                let path = path?;
+                Ok(TestFile { path })
+            })
+            .collect();
+        f.into_iter()
+    }
 }

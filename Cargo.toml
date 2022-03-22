@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 approx = "0.4.0"
 geo = "*"
-include_dir = { version = "0.6", features = ["search"] }
+glob = "0.3.0"
 log = "0.4.14"
 serde =  { version = "*", features = ["derive"] }
 serde-xml-rs = "*"
