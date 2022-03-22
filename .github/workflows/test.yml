@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - geo
+      - minimal-versions
     steps:
       - name: Mark the job as a success
         if: success()
@@ -41,3 +42,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
       - run: cargo test
+  minimal-versions:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    strategy:
+      matrix:
+        container_image:
+          # We aim to support rust-stable plus (at least) the prior 3 releases,
+          # giving us about 6 months of coverage.
+          #
+          # Minimum supported rust version (MSRV)
+          - "georust/geo-ci:rust-1.56"
+          # Two most recent releases - we omit older ones for expedient CI
+          - "georust/geo-ci:rust-1.58"
+          - "georust/geo-ci:rust-1.59"
+    container:
+      image: ${{ matrix.container_image }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo +nightly test -Z minimal-versions
