@@ -1,3 +1,7 @@
+# ARCHIVED!
+
+This has been integrated into https://github.com/georust/geo/tree/main/jts-test-runner
+
 # JTS Test Runner
 
 A tool used to compare the behavior of [GeoRust/geo] to the venerable
